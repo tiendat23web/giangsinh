@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Christmas Gifts & Lights</title>
+    <title>Christmas Gifts & Lights - Smooth Camera</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -49,6 +49,15 @@
             transform: scaleX(-1); opacity: 0.6; border-radius: 8px;
         }
         
+        #photo-indicator {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FFD700; font-size: 24px; font-weight: bold;
+            text-shadow: 0 0 20px #FFD700, 0 0 40px #FF0000;
+            pointer-events: none; z-index: 101;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        
         #error-log { display: none; position: absolute; top: 0; left: 0; color: red; background: rgba(0,0,0,0.8); z-index: 999; padding: 10px; }
     </style>
 </head>
@@ -62,14 +71,13 @@
         <button id="btnStart" onclick="startSystem()">BẮT ĐẦU</button>
     </div>
 
+    <div id="photo-indicator">Ảnh <span id="photo-num">1</span>/5</div>
+
     <div id="canvas-container"></div>
     <video class="input_video" style="display:none"></video>
     <canvas id="camera-preview"></canvas>
 
     <script>
-        // ==========================================
-        // 1. Vandiep
-        // ==========================================
         const MUSIC_URL = "./audio.mp3";
         let bgMusic = new Audio(MUSIC_URL);
         bgMusic.loop = true; bgMusic.volume = 1.0;
@@ -79,7 +87,6 @@
         const photoTextures = [];
         photoFiles.forEach((f, i) => photoTextures[i] = loader.load(f));
 
-        // --- Vandiep ---
         function createCustomTexture(type) {
             const canvas = document.createElement('canvas');
             canvas.width = 128; canvas.height = 128;
@@ -87,7 +94,6 @@
             const cx = 64, cy = 64;
 
             if (type === 'gold_glow') {
-                // Vandiep
                 const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40);
                 grd.addColorStop(0, '#FFFFFF'); 
                 grd.addColorStop(0.2, '#FFFFE0'); 
@@ -96,7 +102,6 @@
                 ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
 
             } else if (type === 'red_light') {
-                // Vandiep
                 const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 50);
                 grd.addColorStop(0, '#FFAAAA'); 
                 grd.addColorStop(0.3, '#FF0000'); 
@@ -104,13 +109,11 @@
                 ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
 
             } else if (type === 'gift_red') {
-                // Vandiep
-                ctx.fillStyle = '#D32F2F'; // Vandiep
+                ctx.fillStyle = '#D32F2F';
                 ctx.fillRect(20, 20, 88, 88);
-                ctx.fillStyle = '#FFD700'; // Vandiep
-                ctx.fillRect(54, 20, 20, 88); // Vandiep
-                ctx.fillRect(20, 54, 88, 20); // Vandiep
-                // Vandiep
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(54, 20, 20, 88);
+                ctx.fillRect(20, 54, 88, 20);
                 ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth=2; ctx.strokeRect(20,20,88,88);
             }
             return new THREE.CanvasTexture(canvas);
@@ -122,13 +125,10 @@
             gift: createCustomTexture('gift_red')
         };
 
-        // ==========================================
-        // 2. Vandiep
-        // ==========================================
         const CONFIG = {
-            goldCount: 2000,    // Hạt vàng
-            redCount: 300,      // Số lượng đèn đỏ
-            giftCount: 150,     // Số lượng hộp quà
+            goldCount: 2000,
+            redCount: 300,
+            giftCount: 150,
             explodeRadius: 65,  
             photoOrbitRadius: 25,
             treeHeight: 70,
@@ -136,17 +136,20 @@
         };
 
         let scene, camera, renderer;
-        let groupGold, groupRed, groupGift; // Vandiep
+        let groupGold, groupRed, groupGift;
         let photoMeshes = [];    
         let titleMesh, starMesh;
         
         let state = 'TREE'; 
         let selectedIndex = 0;
+        
+        // Smooth rotation control
+        let targetRotation = 0;
+        let currentRotation = 0;
         let handX = 0.5;
+        let handXSmooth = 0.5;
+        let rotationVelocity = 0;
 
-        // ==========================================
-        // 3. Vandiep
-        // ==========================================
         function init3D() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
@@ -160,10 +163,9 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             container.appendChild(renderer.domElement);
 
-            // Vandiep
             groupGold = createParticleSystem('gold', CONFIG.goldCount, 2.0);
-            groupRed = createParticleSystem('red', CONFIG.redCount, 3.5); // Vandiep
-            groupGift = createParticleSystem('gift', CONFIG.giftCount, 3.0); // Vandiep
+            groupRed = createParticleSystem('red', CONFIG.redCount, 3.5);
+            groupGift = createParticleSystem('gift', CONFIG.giftCount, 3.0);
 
             createPhotos();
             createDecorations();
@@ -176,13 +178,9 @@
             const pTreeTargets = [];
             
             for(let i=0; i<count; i++) {
-                // --- Vandiep ---
                 const h = Math.random() * CONFIG.treeHeight; 
                 const y = h - CONFIG.treeHeight / 2;
-                
-                // Vandiep
                 let radiusRatio = (type === 'gold') ? Math.sqrt(Math.random()) : 0.9 + Math.random()*0.1;
-                
                 const maxR = (1 - (h / CONFIG.treeHeight)) * CONFIG.treeBaseRadius;
                 const r = maxR * radiusRatio; 
                 const theta = Math.random() * Math.PI * 2;
@@ -191,13 +189,10 @@
                 const tz = r * Math.sin(theta);
                 pTreeTargets.push(tx, y, tz);
 
-                // --- Vandiep ---
                 const u = Math.random();
                 const v = Math.random();
                 const phi = Math.acos(2 * v - 1);
                 const lam = 2 * Math.PI * u;
-                
-                // Vandiep
                 let radMult = (type === 'gift') ? 1.2 : 1.0;
                 const rad = CONFIG.explodeRadius * Math.cbrt(Math.random()) * radMult;
 
@@ -206,7 +201,6 @@
                 const ez = rad * Math.cos(phi);
                 pExplodeTargets.push(ex, ey, ez);
 
-                // Vandiep
                 pPositions.push(tx, y, tz);
             }
 
@@ -218,7 +212,6 @@
                 size: size,
                 map: textures[type],
                 transparent: true, opacity: 1.0,
-                // Vandiep
                 blending: (type === 'gift') ? THREE.NormalBlending : THREE.AdditiveBlending, 
                 depthWrite: false,
                 sizeAttenuation: true
@@ -251,7 +244,6 @@
         }
 
         function createDecorations() {
-            // Vandiep
             const canvas = document.createElement('canvas');
             canvas.width = 1024; canvas.height = 256;
             const ctx = canvas.getContext('2d');
@@ -266,7 +258,6 @@
             titleMesh.position.set(0, 50, 0);
             scene.add(titleMesh);
 
-            // Vandiep
             const starCanvas = document.createElement('canvas');
             starCanvas.width = 128; starCanvas.height = 128;
             const sCtx = starCanvas.getContext('2d');
@@ -285,7 +276,7 @@
             scene.add(starMesh);
         }
 
-        function updateParticleGroup(group, targetState, speed, handRotY, time, isBlinking) {
+        function updateParticleGroup(group, targetState, speed, time, isBlinking) {
             const positions = group.geometry.attributes.position.array;
             const targetKey = (targetState === 'TREE') ? 'tree' : 'explode';
             const targets = group.geometry.userData[(targetState === 'PHOTO') ? 'explode' : targetKey];
@@ -295,13 +286,9 @@
             }
             group.geometry.attributes.position.needsUpdate = true;
             
-            // Vandiep
             if (targetState === 'TREE') {
                 group.rotation.y += 0.003;
-                // Vandiep
                 if(isBlinking) {
-                    // Vandiep
-                    // Vandiep
                     const scale = 1 + Math.sin(time * 5) * 0.2;
                     group.scale.set(scale, scale, scale);
                 } else {
@@ -309,7 +296,7 @@
                 }
             } else {
                 group.scale.set(1,1,1);
-                group.rotation.y += (handRotY - group.rotation.y) * 0.05;
+                group.rotation.y = currentRotation;
             }
         }
 
@@ -317,14 +304,23 @@
             requestAnimationFrame(animate);
             const time = Date.now() * 0.001;
             const speed = 0.06;
-            const handRotY = (handX - 0.5) * 2.5;
 
-            // Vandiep
-            updateParticleGroup(groupGold, state, speed, handRotY, time, false);
-            updateParticleGroup(groupRed, state, speed, handRotY, time, true); // Vandiep
-            updateParticleGroup(groupGift, state, speed, handRotY, time, false);
+            // Smooth hand tracking
+            handXSmooth += (handX - handXSmooth) * 0.15;
+            
+            // Calculate target rotation with extended range
+            targetRotation = (handXSmooth - 0.5) * Math.PI * 6;
+            
+            // Smooth rotation with velocity
+            const rotDiff = targetRotation - currentRotation;
+            rotationVelocity += rotDiff * 0.03;
+            rotationVelocity *= 0.92; // Damping
+            currentRotation += rotationVelocity;
 
-            // Vandiep
+            updateParticleGroup(groupGold, state, speed, time, false);
+            updateParticleGroup(groupRed, state, speed, time, true);
+            updateParticleGroup(groupGift, state, speed, time, false);
+
             photoMeshes.forEach((mesh, i) => {
                 if(!mesh.material.map && photoTextures[i]) {
                     mesh.material.map = photoTextures[i]; mesh.material.needsUpdate = true;
@@ -336,17 +332,17 @@
                 titleMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
                 starMesh.rotation.z -= 0.02;
                 photoMeshes.forEach(m => { m.scale.lerp(new THREE.Vector3(0,0,0), 0.1); m.visible = false; });
+                document.getElementById('photo-indicator').style.opacity = '0';
 
             } else if (state === 'EXPLODE') {
                 titleMesh.visible = false; starMesh.visible = false;
                 
-                const baseAngle = groupGold.rotation.y; 
                 const angleStep = (Math.PI * 2) / 5;
                 let bestIdx = 0; let maxZ = -999;
 
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
-                    const angle = baseAngle + i * angleStep;
+                    const angle = currentRotation + i * angleStep;
                     const x = Math.sin(angle) * CONFIG.photoOrbitRadius;
                     const z = Math.cos(angle) * CONFIG.photoOrbitRadius;
                     const y = Math.sin(time + i) * 3; 
@@ -364,6 +360,8 @@
                     }
                 });
                 selectedIndex = bestIdx;
+                document.getElementById('photo-num').innerText = (bestIdx + 1);
+                document.getElementById('photo-indicator').style.opacity = '0.8';
 
             } else if (state === 'PHOTO') {
                 photoMeshes.forEach((mesh, i) => {
@@ -376,14 +374,13 @@
                         mesh.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
                     }
                 });
+                document.getElementById('photo-num').innerText = (selectedIndex + 1);
+                document.getElementById('photo-indicator').style.opacity = '1';
             }
 
             renderer.render(scene, camera);
         }
 
-        // ==========================================
-        // 4. Vandiep
-        // ==========================================
         function startSystem() {
             document.getElementById('btnStart').style.display = 'none';
             bgMusic.play().catch(e => console.log(e));
@@ -399,7 +396,8 @@
             hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
             hands.onResults(results => {
-                ctx.clearRect(0,0,100,75); ctx.drawImage(results.image, 0, 0, 100, 75);
+                ctx.clearRect(0,0,120,90); 
+                ctx.drawImage(results.image, 0, 0, 120, 90);
 
                 if(results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
@@ -417,10 +415,11 @@
                         statusDiv.innerText = "✊ Thu Cây Thông"; statusDiv.style.color = "#FFD700";
                     } else if (pinchDist < 0.05) {
                         state = 'PHOTO';
-                        statusDiv.innerText = "👌 Xem Ảnh"; statusDiv.style.color = "#00FFFF";
+                        statusDiv.innerText = "👌 Xem Ảnh " + (selectedIndex + 1) + "/5"; 
+                        statusDiv.style.color = "#00FFFF";
                     } else {
                         state = 'EXPLODE'; 
-                        statusDiv.innerText = "🖐 Bung Quà & Ảnh"; statusDiv.style.color = "#FFA500";
+                        statusDiv.innerText = "🖐 Xoay Xem Ảnh"; statusDiv.style.color = "#FFA500";
                     }
                 } else {
                     state = 'TREE'; 
@@ -430,7 +429,7 @@
 
             const cameraUtils = new Camera(video, {
                 onFrame: async () => {
-                    frameCnt++; if(frameCnt%3 !== 0) return; 
+                    frameCnt++; if(frameCnt%2 !== 0) return; 
                     await hands.send({image: video});
                 }, width: 320, height: 240
             });
@@ -438,9 +437,12 @@
         }
 
         window.addEventListener('resize', () => {
-            if(camera) { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+            if(camera) { 
+                camera.aspect = window.innerWidth/window.innerHeight; 
+                camera.updateProjectionMatrix(); 
+                renderer.setSize(window.innerWidth, window.innerHeight); 
+            }
         });
-        function logError(e) { document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerText+=e+"\n"; }
     </script>
 </body>
 </html>
